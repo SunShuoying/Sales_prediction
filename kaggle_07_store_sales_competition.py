@@ -157,52 +157,52 @@ def process_data(train, test, features, features_non_numeric):
         data['promonov'] = data.PromoInterval.apply(lambda x: 0 if isinstance(x, float) else 1 if "Nov" in x else 0)
         data['promodec'] = data.PromoInterval.apply(lambda x: 0 if isinstance(x, float) else 1 if "Dec" in x else 0)
 
-        #Feature set
-        #先把noisy特征去掉, 目前所有的features是test中的列名提取出的,数值型特征&非数值型特征
-        noisy_features = [myid, 'Date']
-        features = [c for c in features if c not in noisy_features]
-        features_non_numeric = [c for c in features_non_numeric if c not in noisy_features]
+    #Feature set
+    #先把noisy特征去掉, 目前所有的features是test中的列名提取出的,数值型特征&非数值型特征
+    noisy_features = [myid, 'Date']
+    features = [c for c in features if c not in noisy_features]
+    features_non_numeric = [c for c in features_non_numeric if c not in noisy_features]
 
-        #加入新的特征'year', 'month', 'day', 注意这里append是当作整体添加到其中，extend是当作一个序列，与原序列合并放在后面
-        features.extend(['year', 'month', 'day'])
+    #加入新的特征'year', 'month', 'day', 注意这里append是当作整体添加到其中，extend是当作一个序列，与原序列合并放在后面
+    features.extend(['year', 'month', 'day'])
 
-        #预处理numberic_values, 填充缺失值
-        ## http://stackoverflow.com/questions/25239958/impute-categorical-missing-values-in-scikit-learn
-        class DataFrameImputer(TransformerMixin):
-            #初始化
-            def __init__(self):
-                '''
-                Inpute missing values.
-                columns of dtype object are inputed with the most frequent value in column.
-                columns of other types are inpute with mean of column
-                '''
-            #满足类型，填充出现次数最多的，不满足，填充均值，这个应该是针对数值型特征和非数值型特征来设计的
-            def fit(self, X, y=None):
-                self.fill = pd.Series([X[c].value_counts().index[0]  # mode
-                                       if X[c].dtype == np.dtype('O') else X[c].mean() for c in X],  # mean
-                                      index=X.columns)
-                return self
-            def transform(self, X, y=None):
-                return X.fillna(self.fill)
+    #预处理numberic_values, 填充缺失值
+    ## http://stackoverflow.com/questions/25239958/impute-categorical-missing-values-in-scikit-learn
+    class DataFrameImputer(TransformerMixin):
+        #初始化
+        def __init__(self):
+            '''
+            Inpute missing values.
+            columns of dtype object are inputed with the most frequent value in column.
+            columns of other types are inpute with mean of column
+            '''
+        #满足类型，填充出现次数最多的，不满足，填充均值，这个应该是针对数值型特征和非数值型特征来设计的
+        def fit(self, X, y=None):
+            self.fill = pd.Series([X[c].value_counts().index[0]  # mode
+                                   if X[c].dtype == np.dtype('O') else X[c].mean() for c in X],  # mean
+                                  index=X.columns)
+            return self
+        def transform(self, X, y=None):
+            return X.fillna(self.fill)
 
-        train = DataFrameImputer().fit_transform(train)
-        test = DataFrameImputer().fit_transform(test)
+    train = DataFrameImputer().fit_transform(train)
+    test = DataFrameImputer().fit_transform(test)
 
-        #预处理non-numberic的值
-        #LabelEncoder可以将标签分配一个0—n_classes-1之间的编码
-        le = LabelEncoder()
-        for col in features_non_numeric:
-            le.fit(list(train[col]) + list(test[col]))
-            train[col] = le.transform(train[col])
-            test[col] = le.transform(test[col])
-        #做归一化操作用StandardScaler(), 把需要做归一化的列挑出来
-        scaler = StandardScaler()
-        for col in set(features) - set(features_non_numeric) - set([]):
-            scaler.fit(np.array(list(train[col]) + list(test[col])).reshape(1,-1))
-            #ValueError: Expected 2D array, got 1D array instead:https://blog.csdn.net/dongyanwen6036/article/details/78864585
-            train[col] = scaler.transform(train[col])
-            test[col] = scaler.transform(test[col])
-        return (train, test, features, features_non_numeric)
+    #预处理non-numberic的值
+    #LabelEncoder可以将标签分配一个0—n_classes-1之间的编码
+    le = LabelEncoder()
+    for col in features_non_numeric:
+        le.fit(list(train[col]) + list(test[col]))
+        train[col] = le.transform(train[col])
+        test[col] = le.transform(test[col])
+    #做归一化操作用StandardScaler(), 把需要做归一化的列挑出来
+    scaler = StandardScaler()
+    for col in set(features) - set(features_non_numeric) - set([]):
+        scaler.fit(np.array(list(train[col]) + list(test[col])).reshape(-1, 1))
+        #ValueError: Expected 2D array, got 1D array instead:https://blog.csdn.net/dongyanwen6036/article/details/78864585
+        train[col] = scaler.transform(np.array(list(train[col])).reshape(-1, 1))
+        test[col] = scaler.transform(np.array(list(test[col])).reshape(-1, 1))
+    return (train, test, features, features_non_numeric)
 
 
 #【4】训练与分析数据,
